@@ -11,23 +11,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 demucs-test/
 ├── input/              # 元の音楽ファイルを配置
-├── output/             # 分離結果の出力先（将来的な拡張用）
-├── separated/          # Demucsが自動生成する出力ディレクトリ
-│   └── htdemucs/      # モデル名のフォルダ
-│       └── 曲名/       # 各曲ごとのフォルダ
-│           ├── vocals.mp3      # 分離されたボーカル
-│           ├── drums.mp3       # 分離されたドラム
-│           ├── bass.mp3        # 分離されたベース
-│           ├── other.mp3       # 分離されたその他
-│           ├── no_drums.mp3    # ドラム抜きミックス
-│           └── no_vocals.mp3   # ボーカル抜きミックス
-├── sample/             # 一時的なWAV変換ファイル用
+├── output/             # 分離結果の出力先
+│   └── htdemucs_6s/   # モデル名のフォルダ（6トラック分離）
+│       ├── 曲名1/      # 各曲ごとのフォルダ
+│       │   ├── vocals.mp3      # 分離されたボーカル
+│       │   ├── drums.mp3       # 分離されたドラム
+│       │   ├── bass.mp3        # 分離されたベース
+│       │   ├── guitar.mp3      # 分離されたギター
+│       │   ├── piano.mp3       # 分離されたピアノ/キーボード
+│       │   ├── other.mp3       # 分離されたその他（シンセ・電子音など）
+│       │   ├── no_drums.mp3    # ドラム抜きミックス
+│       │   └── no_vocals.mp3   # ボーカル抜きミックス
+│       └── 曲名2/
+│           └── ...
+├── temp/               # 一時WAVファイル用（処理後自動削除）
 ├── scripts/            # 実行用スクリプト
 │   └── separate.py    # メインの音源分離スクリプト
 ├── function_demucs.py  # コア機能（音源分離・ミックス関数）
-├── test_demucs.py      # 簡易テスト用スクリプト
+├── test_demucs.py      # 簡易テスト用スクリプト（レガシー）
 └── run.sh              # 簡易実行用シェルスクリプト
 ```
+
+**注意**:
+- デフォルトで `htdemucs_6s` モデル（6トラック分離）を使用します
+- すべての成果物は `output/htdemucs_6s/曲名/` に出力されます
+- `temp/` ディレクトリは一時的に作成され、処理完了後に自動削除されます
+- 複数の曲を処理すると `output/htdemucs_6s/` 配下に曲名フォルダが増えていきます
+
+**6トラックの内訳**:
+- `vocals` - ボーカル
+- `drums` - ドラム
+- `bass` - ベース
+- `guitar` - ギター
+- `piano` - ピアノ・キーボード系
+- `other` - その他（シンセ・電子音など）
 
 ## 環境構築
 
@@ -52,7 +69,7 @@ cp ~/Music/your_song.mp3 input/
 # 2. スクリプトを実行
 ./run.sh your_song.mp3
 
-# 結果は separated/htdemucs/your_song/ に出力される
+# 結果は output/htdemucs_6s/your_song/ に出力される
 ```
 
 ### Pythonスクリプトで直接実行
@@ -68,14 +85,14 @@ python3 test_demucs.py
 
 ### 関数として使用（プログラマティックな利用）
 ```python
-from function_demucs import demucs_separate, mix_without_stem, Model, Format
+from function_demucs import demucs_separate, mix_without_stem, Model
 
-# 音源分離
-demucs_separate("path/to/audio.mp3", model_name=Model.htdemucs, format=Format.mp3)
+# 音源分離（output/htdemucs/曲名/ に結果が出力される）
+output_dir = demucs_separate("path/to/audio.mp3", model_name=Model.htdemucs)
 
 # ミックス作成
-mix_without_stem("separated/htdemucs/曲名", "drums")   # ドラム抜き
-mix_without_stem("separated/htdemucs/曲名", "vocals")  # ボーカル抜き
+mix_without_stem(output_dir, "drums")   # ドラム抜き
+mix_without_stem(output_dir, "vocals")  # ボーカル抜き
 ```
 
 ## アーキテクチャ
@@ -85,10 +102,10 @@ mix_without_stem("separated/htdemucs/曲名", "vocals")  # ボーカル抜き
 - **function_demucs.py**: メインロジック
   - `demucs_separate()`: 音源分離のエントリーポイント
   - 処理フロー:
-    1. ffmpeg で入力音声を WAV 形式に変換
-    2. `sample/` ディレクトリに一時ファイル保存
-    3. `demucs.separate.main()` を options 配列で呼び出し
-    4. 分離結果は `separated/{model_name}/` に出力
+    1. ffmpeg で入力音声を WAV 形式に変換（temp/ に一時保存）
+    2. `demucs.separate.main()` で音源分離を実行（output/htdemucs/曲名/ に直接出力）
+    3. 一時WAVファイルと temp/ ディレクトリを削除
+  - `mix_without_stem()`: 指定したステムを除いたミックスを作成
 
 - **test_demucs.py**: 動作確認用スクリプト
   - `demucs.separate.main()` を直接呼び出す簡易テスト

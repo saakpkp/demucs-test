@@ -11,7 +11,7 @@ from pathlib import Path
 # プロジェクトルートをパスに追加（importできるようにする）
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from function_demucs import demucs_separate, mix_without_stem, Model, Format
+from function_demucs import demucs_separate, mix_specific_stems, Model
 
 def main():
     # コマンドライン引数からファイルパスを取得
@@ -26,19 +26,24 @@ def main():
 
     print(f"🎵 音源分離を開始: {filename}")
 
-    # 音源分離を実行
-    demucs_separate(input_file, model_name=Model.htdemucs, format=Format.mp3)
+    # 音源分離を実行（6トラックモデル使用）
+    output_dir = demucs_separate(input_file, model_name=Model.htdemucs_6s)
 
-    # 分離されたファイルのディレクトリ
-    separated_dir = f"separated/htdemucs/{filename}"
+    if not output_dir:
+        print("❌ 音源分離に失敗しました")
+        sys.exit(1)
 
-    print(f"🥁 ドラム抜きを作成中...")
-    mix_without_stem(separated_dir, "drums")
+    print(f"\n🥁 ドラム抜きを作成中...")
+    all_stems = ["vocals", "drums", "bass", "guitar", "piano", "other"]
+    no_drums = [s for s in all_stems if s != "drums"]
+    mix_specific_stems(output_dir, no_drums, "no_drums")
 
-    print(f"🎤 ボーカル抜きを作成中...")
-    mix_without_stem(separated_dir, "vocals")
+    print(f"\n🎹 ピアノ+その他ミックスを作成中...")
+    mix_specific_stems(output_dir, ["piano", "other"], "piano_other")
 
-    print(f"✅ 完了！結果: {separated_dir}/")
+    print(f"\n✅ 完了！結果: {output_dir}/")
+    print(f"📁 分離トラック: vocals.mp3, drums.mp3, bass.mp3, guitar.mp3, piano.mp3, other.mp3")
+    print(f"📁 ミックス: no_drums.mp3, piano_other.mp3")
 
 if __name__ == "__main__":
     main()
