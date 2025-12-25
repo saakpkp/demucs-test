@@ -1,0 +1,3 @@
+demucs
+ffmpeg-python
+pydub
